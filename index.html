@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Symes — Filet Crochet Chart</title>
+<style>
+  :root{
+    --ink:#2b2622;
+    --paper:#faf7f2;
+    --panel:#ffffff;
+    --line:#e4ddd2;
+    --line-strong:#c9beac;
+    --cell-empty:#ffffff;
+    --cell-filled:#2b2622;
+    --accent:#b5563c;
+    --accent-soft:#f1ded6;
+    --done:#8fa985;
+    --done-soft:#e3ead9;
+    --current-row:#fbe9c9;
+    --shadow:0 2px 10px rgba(43,38,34,0.08);
+  }
+
+  *{box-sizing:border-box;}
+
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    padding:24px 16px 60px;
+  }
+
+  h1{
+    font-size:1.4rem;
+    font-weight:700;
+    letter-spacing:0.02em;
+    margin:0 0 2px;
+  }
+  .subtitle{
+    color:#8a7f70;
+    font-size:0.88rem;
+    margin:0 0 18px;
+  }
+
+  .layout{
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+    max-width:1200px;
+    margin:0 auto;
+  }
+
+  /* ---- Control panel ---- */
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:12px;
+    box-shadow:var(--shadow);
+    padding:14px 18px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:18px;
+    align-items:center;
+  }
+
+  .stat{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    min-width:78px;
+  }
+  .stat .num{
+    font-size:1.3rem;
+    font-weight:700;
+    line-height:1;
+  }
+  .stat .label{
+    font-size:0.7rem;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    color:#8a7f70;
+  }
+
+  .progress-wrap{
+    flex:1 1 220px;
+    min-width:180px;
+  }
+  .progress-bar{
+    background:var(--line);
+    border-radius:99px;
+    height:10px;
+    overflow:hidden;
+  }
+  .progress-fill{
+    background:var(--done);
+    height:100%;
+    width:0%;
+    transition:width 0.25s ease;
+  }
+  .progress-wrap .label{
+    font-size:0.7rem;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    color:#8a7f70;
+    margin-bottom:5px;
+  }
+
+  .row-nav{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .row-nav button{
+    width:32px;height:32px;
+    border-radius:8px;
+    border:1px solid var(--line-strong);
+    background:#fff;
+    font-size:1rem;
+    cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--ink);
+  }
+  .row-nav button:hover{background:var(--accent-soft);border-color:var(--accent);}
+  .row-nav .current-label{
+    font-size:0.85rem;
+    font-weight:600;
+    min-width:98px;
+    text-align:center;
+  }
+
+  .btn{
+    border:1px solid var(--line-strong);
+    background:#fff;
+    color:var(--ink);
+    padding:8px 14px;
+    border-radius:8px;
+    font-size:0.82rem;
+    font-weight:600;
+    cursor:pointer;
+  }
+  .btn:hover{background:var(--accent-soft);border-color:var(--accent);}
+  .btn.danger:hover{background:#f6dcd6;border-color:#b5563c;}
+
+  /* ---- Chart ---- */
+  .chart-panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:12px;
+    box-shadow:var(--shadow);
+    padding:18px;
+    overflow:auto;
+  }
+
+  .grid-wrap{
+    display:inline-block;
+    min-width:100%;
+  }
+
+  table.chart{
+    border-collapse:collapse;
+    margin:0 auto;
+  }
+
+  table.chart td{
+    width:17px;
+    height:17px;
+    min-width:17px;
+    min-height:17px;
+    border:1px solid var(--line);
+    padding:0;
+    text-align:center;
+    vertical-align:middle;
+    cursor:pointer;
+    position:relative;
+  }
+
+  /* thicker guide lines every 10 */
+  td.grid10-right{ border-right:1.5px solid var(--line-strong); }
+  td.grid10-bottom{ border-bottom:1.5px solid var(--line-strong); }
+
+  td.empty{ background:var(--cell-empty); }
+  td.filled{ background:var(--cell-filled); }
+  td.filled.done{ background:var(--done); }
+  td.empty.done{ background:var(--done-soft); }
+
+  td.current-row{ box-shadow:inset 0 0 0 9999px rgba(251,233,201,0.55); }
+  td.filled.current-row{ box-shadow:inset 0 0 0 9999px rgba(251,233,201,0.0); } /* keep filled cells legible */
+
+  tr.current-row-highlight td.empty{ background:var(--current-row); }
+
+  .rowhead, .colhead{
+    font-size:9px;
+    font-family:"SF Mono",Menlo,Consolas,monospace;
+    color:#8a7f70;
+    text-align:center;
+    vertical-align:middle;
+    user-select:none;
+    cursor:pointer;
+    padding:0 3px;
+    border:none !important;
+  }
+  .rowhead:hover, .colhead:hover{ color:var(--accent); font-weight:700; }
+  .rowhead.active, .colhead.active{ color:var(--accent); font-weight:700; }
+
+  .colhead{
+    writing-mode:horizontal-tb;
+    height:20px;
+  }
+
+  .corner{ border:none !important; }
+
+  footer{
+    max-width:1200px;
+    margin:18px auto 0;
+    font-size:0.78rem;
+    color:#8a7f70;
+    line-height:1.5;
+  }
+
+  .legend{
+    display:flex;
+    gap:16px;
+    flex-wrap:wrap;
+    align-items:center;
+    font-size:0.78rem;
+    color:#5c5449;
+  }
+  .legend span.swatch{
+    display:inline-block;
+    width:12px;height:12px;
+    border:1px solid var(--line-strong);
+    border-radius:2px;
+    margin-right:5px;
+    vertical-align:middle;
+  }
+  .sw-filled{background:var(--cell-filled);}
+  .sw-empty{background:var(--cell-empty);}
+  .sw-done{background:var(--done);}
+  .sw-donee{background:var(--done-soft);}
+  .sw-current{background:var(--current-row);}
+
+  @media print{
+    .panel, footer{display:none;}
+    body{padding:0;background:#fff;}
+    .chart-panel{box-shadow:none;border:none;}
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <div>
+    <h1>Symes — Filet Crochet Chart</h1>
+    <p class="subtitle">50 × 50 grid · click any square to mark it worked · click a row number to set your current row</p>
+  </div>
+
+  <div class="panel">
+    <div class="stat">
+      <span class="num" id="statDone">0</span>
+      <span class="label">stitches done</span>
+    </div>
+    <div class="stat">
+      <span class="num" id="statTotal">0</span>
+      <span class="label">filled total</span>
+    </div>
+    <div class="stat">
+      <span class="num" id="statPercent">0%</span>
+      <span class="label">complete</span>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="label">Overall progress</div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+
+    <div class="row-nav">
+      <button id="prevRow" title="Previous row">↑</button>
+      <span class="current-label" id="currentRowLabel">Row 39</span>
+      <button id="nextRow" title="Next row">↓</button>
+    </div>
+
+    <button class="btn" id="markRowBtn">Mark row done</button>
+    <button class="btn danger" id="resetBtn">Reset progress</button>
+  </div>
+
+  <div class="chart-panel">
+    <div class="grid-wrap">
+      <table class="chart" id="chartTable"></table>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span><span class="swatch sw-filled"></span>stitch (fill)</span>
+    <span><span class="swatch sw-empty"></span>mesh (chain space)</span>
+    <span><span class="swatch sw-current"></span>current row</span>
+    <span><span class="swatch sw-done"></span>stitch worked</span>
+    <span><span class="swatch sw-donee"></span>mesh worked</span>
+  </div>
+
+  <footer>
+    Row 1 is the top of the chart, Row 50 is the bottom. Rows 39–50 are the plain mesh base
+    you've already worked. The design runs from Row 38 up to Row 11, then Rows 10–1 are plain
+    mesh to finish. Progress is saved automatically in this browser — reopen the file anytime
+    to pick up where you left off.
+  </footer>
+</div>
+
+<script>
+const GRID = [
+[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,1,1,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,1,1,0,0,1,1,0,0,0,1,1,1,0,0,0,1,0,0,0,0,0],
+[0,0,0,0,0,0,1,1,1,0,0,0,1,1,0,0,0,0,1,1,0,0,0,1,0,0,1,1,1,0,1,1,1,0,1,0,0,1,1,0,1,0,0,0,1,1,0,0,0,0],
+[0,0,0,0,1,1,0,0,0,1,0,0,0,1,1,0,0,0,1,0,0,0,1,0,0,1,1,1,0,0,1,1,0,0,1,0,1,1,0,0,1,0,0,1,0,1,0,0,0,0],
+[0,0,0,1,1,0,0,0,0,1,0,0,0,0,1,0,0,1,1,0,0,0,1,0,0,1,1,0,0,1,1,0,0,1,0,0,1,0,1,1,0,0,1,1,0,1,1,0,1,0],
+[0,0,1,1,0,0,0,0,1,1,0,0,0,1,1,0,0,1,0,0,0,1,0,0,1,1,0,0,0,1,0,0,1,1,0,0,1,1,1,0,0,1,1,0,0,0,1,0,1,0],
+[0,0,1,0,0,0,0,1,1,0,0,0,0,1,1,0,0,1,0,0,1,1,1,1,1,1,0,0,1,1,0,0,1,0,0,1,1,0,0,0,1,1,0,1,1,0,1,1,0,0],
+[0,0,1,0,0,0,0,0,0,0,0,0,1,1,0,0,0,1,1,1,1,1,1,0,1,0,0,0,1,0,0,0,1,0,1,1,1,0,0,1,1,1,1,0,0,1,1,0,0,0],
+[0,1,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,1,1,1,1,0,0,1,0,0,0,1,0,0,0,0,1,1,0,0,1,1,1,0,0,1,1,1,1,0,0,0,0],
+[0,1,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,1,1,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,1,1,0,0,0,0,0,1,1,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,1,1,1,1,1,1,1,0,0,0,0,0,1,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,1,1,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+];
+
+const N = 50;
+const STORAGE_KEY = 'symes-chart-progress-v1';
+const ROW_KEY = 'symes-chart-currentrow-v1';
+
+let doneCells = new Set(); // "r-c" strings
+let currentRow = 39; // 1-indexed, first row after the 12 already-worked mesh rows at bottom
+
+function loadState(){
+  try{
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if(saved) doneCells = new Set(JSON.parse(saved));
+    const savedRow = localStorage.getItem(ROW_KEY);
+    if(savedRow) currentRow = parseInt(savedRow,10);
+  }catch(e){}
+}
+function saveState(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(doneCells)));
+    localStorage.setItem(ROW_KEY, String(currentRow));
+  }catch(e){}
+}
+
+function buildTable(){
+  const table = document.getElementById('chartTable');
+  table.innerHTML = '';
+
+  // top header row
+  const headRow = document.createElement('tr');
+  const corner1 = document.createElement('td');
+  corner1.className='corner';
+  headRow.appendChild(corner1);
+  for(let c=1;c<=N;c++){
+    const th = document.createElement('td');
+    th.className='colhead';
+    th.textContent = c;
+    th.dataset.col = c;
+    if(c % 10 === 0) th.style.fontWeight='700';
+    headRow.appendChild(th);
+  }
+  const corner2 = document.createElement('td');
+  corner2.className='corner';
+  headRow.appendChild(corner2);
+  table.appendChild(headRow);
+
+  for(let r=1;r<=N;r++){
+    const tr = document.createElement('tr');
+    tr.dataset.row = r;
+
+    const rh1 = document.createElement('td');
+    rh1.className='rowhead';
+    rh1.textContent = r;
+    rh1.dataset.row = r;
+    tr.appendChild(rh1);
+
+    for(let c=1;c<=N;c++){
+      const td = document.createElement('td');
+      const filled = GRID[r-1][c-1] === 1;
+      td.className = filled ? 'filled' : 'empty';
+      if(c % 10 === 0) td.classList.add('grid10-right');
+      if(r % 10 === 0) td.classList.add('grid10-bottom');
+      td.dataset.row = r;
+      td.dataset.col = c;
+      const key = r+'-'+c;
+      if(doneCells.has(key)) td.classList.add('done');
+      td.addEventListener('click', onCellClick);
+      tr.appendChild(td);
+    }
+
+    const rh2 = document.createElement('td');
+    rh2.className='rowhead';
+    rh2.textContent = r;
+    rh2.dataset.row = r;
+    tr.appendChild(rh2);
+
+    table.appendChild(tr);
+  }
+
+  // bottom header row
+  const footRow = document.createElement('tr');
+  const corner3 = document.createElement('td');
+  corner3.className='corner';
+  footRow.appendChild(corner3);
+  for(let c=1;c<=N;c++){
+    const th = document.createElement('td');
+    th.className='colhead';
+    th.textContent = c;
+    th.dataset.col = c;
+    if(c % 10 === 0) th.style.fontWeight='700';
+    footRow.appendChild(th);
+  }
+  const corner4 = document.createElement('td');
+  corner4.className='corner';
+  footRow.appendChild(corner4);
+  table.appendChild(footRow);
+
+  // click row numbers to set current row
+  table.querySelectorAll('.rowhead').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      currentRow = parseInt(el.dataset.row,10);
+      saveState();
+      renderHighlights();
+    });
+  });
+}
+
+function onCellClick(e){
+  const td = e.currentTarget;
+  const key = td.dataset.row+'-'+td.dataset.col;
+  if(doneCells.has(key)){
+    doneCells.delete(key);
+    td.classList.remove('done');
+  } else {
+    doneCells.add(key);
+    td.classList.add('done');
+  }
+  saveState();
+  updateStats();
+}
+
+function renderHighlights(){
+  document.querySelectorAll('tr[data-row]').forEach(tr=>{
+    const r = parseInt(tr.dataset.row,10);
+    tr.classList.toggle('current-row-highlight', r===currentRow);
+    tr.querySelectorAll('td.filled, td.empty').forEach(td=>{
+      td.classList.toggle('current-row', r===currentRow);
+    });
+  });
+  document.querySelectorAll('.rowhead').forEach(el=>{
+    el.classList.toggle('active', parseInt(el.dataset.row,10)===currentRow);
+  });
+  document.getElementById('currentRowLabel').textContent = 'Row ' + currentRow;
+
+  // scroll current row into view
+  const activeRowEl = document.querySelector('tr[data-row="'+currentRow+'"]');
+  if(activeRowEl){
+    activeRowEl.scrollIntoView({block:'center', behavior:'smooth'});
+  }
+}
+
+function updateStats(){
+  let total = 0, done = 0;
+  for(let r=1;r<=N;r++){
+    for(let c=1;c<=N;c++){
+      if(GRID[r-1][c-1]===1){
+        total++;
+        if(doneCells.has(r+'-'+c)) done++;
+      }
+    }
+  }
+  document.getElementById('statDone').textContent = done;
+  document.getElementById('statTotal').textContent = total;
+  const pct = total>0 ? Math.round((done/total)*100) : 0;
+  document.getElementById('statPercent').textContent = pct+'%';
+  document.getElementById('progressFill').style.width = pct+'%';
+}
+
+document.getElementById('prevRow').addEventListener('click', ()=>{
+  if(currentRow>1){ currentRow--; saveState(); renderHighlights(); }
+});
+document.getElementById('nextRow').addEventListener('click', ()=>{
+  if(currentRow<N){ currentRow++; saveState(); renderHighlights(); }
+});
+document.getElementById('markRowBtn').addEventListener('click', ()=>{
+  for(let c=1;c<=N;c++){
+    if(GRID[currentRow-1][c-1]===1){
+      doneCells.add(currentRow+'-'+c);
+    }
+  }
+  buildTable();
+  renderHighlights();
+  updateStats();
+});
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  if(confirm('Clear all marked progress? This cannot be undone.')){
+    doneCells.clear();
+    currentRow = 39;
+    saveState();
+    buildTable();
+    renderHighlights();
+    updateStats();
+  }
+});
+
+loadState();
+buildTable();
+renderHighlights();
+updateStats();
+</script>
+</body>
+</html>
